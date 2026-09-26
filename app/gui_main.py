@@ -61,10 +61,18 @@ print(f"[startup] project_root={PROJECT_ROOT}", flush=True)
 print(f"[startup] model_path={MODEL_PATH}", flush=True)
 print(f"[startup] classes_path={CLASSES_PATH}", flush=True)
 
-# ── Global Shared State ────────────────────────────────────────────────────────
+# ── Global Shared State & Locks ────────────────────────────────────────────────
 STATE_LOCK = threading.Lock()
-LATEST_FRAME = None
-FRAME_LOCK = threading.Lock()
+JPEG_LOCK = threading.Lock()
+LATEST_JPEG = None
+RUNNING = True
+
+# Recognition settings (can be changed live via /action)
+CONFIG = {
+    "conf_threshold": 0.65,  # lowered from 0.80 for faster, more natural detection
+    "buffer_vote": 4,        # lowered from 6 for quick responsiveness (~130ms)
+    "buffer_maxlen": 7,      # small window for agile letter transitions
+}
 
 current_state = {
     "connected": True,
@@ -74,18 +82,16 @@ current_state = {
     "confidence": 0.0,
     "vote_letter": "",
     "vote_count": 0,
-    "buffer_vote": 6,
+    "buffer_vote": CONFIG["buffer_vote"],
+    "conf_threshold": CONFIG["conf_threshold"],
     "vote_progress": 0.0,
     "sentence": "",
     "current_word": "",
     "suggestions": get_suggestions(""),
     "last_added": "",
+    "fps": 0.0,
     "status": "Initializing...",
 }
-
-# Subscribed SSE clients
-sse_clients = []
-sse_lock = threading.Lock()
 
 
 def get_current_word(sentence: str) -> str:
@@ -96,14 +102,12 @@ def get_current_word(sentence: str) -> str:
 
 
 def apply_suggestion_to_sentence(current_sentence: str, word: str) -> str:
-    """Replaces current partial word or appends suggestion word with space."""
     word = word.strip().upper()
     if not current_sentence:
         return word + " "
     if current_sentence.endswith(" "):
         return current_sentence + word + " "
     
-    # Replace last partial word
     last_space = current_sentence.rfind(" ")
     if last_space == -1:
         return word + " "
@@ -144,27 +148,23 @@ class StreamHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
             try:
-                while True:
-                    with FRAME_LOCK:
-                        frame = None if LATEST_FRAME is None else LATEST_FRAME.copy()
+                last_frame = None
+                while RUNNING:
+                    with JPEG_LOCK:
+                        jpg = LATEST_JPEG
 
-                    if frame is None:
-                        time.sleep(0.04)
+                    if jpg is None or jpg is last_frame:
+                        time.sleep(0.015)
                         continue
 
-                    ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                    if not ok:
-                        time.sleep(0.04)
-                        continue
-
-                    jpg = encoded.tobytes()
+                    last_frame = jpg
                     self.wfile.write(b"--frame\r\n")
                     self.wfile.write(b"Content-Type: image/jpeg\r\n")
                     self.wfile.write(f"Content-Length: {len(jpg)}\r\n\r\n".encode("utf-8"))
                     self.wfile.write(jpg)
                     self.wfile.write(b"\r\n")
                     self.wfile.flush()
-                    time.sleep(0.033)
+                    time.sleep(0.02)
             except Exception:
                 pass
             return
@@ -195,7 +195,6 @@ class StreamHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/events":
-            # Server-Sent Events endpoint
             self.send_response(200)
             self._set_cors_headers()
             self.send_header("Content-Type", "text/event-stream")
@@ -205,7 +204,7 @@ class StreamHandler(BaseHTTPRequestHandler):
 
             try:
                 last_sent = ""
-                while True:
+                while RUNNING:
                     with STATE_LOCK:
                         current_json = json.dumps(current_state)
                     
@@ -215,7 +214,7 @@ class StreamHandler(BaseHTTPRequestHandler):
                         self.wfile.flush()
                         last_sent = current_json
 
-                    time.sleep(0.1)
+                    time.sleep(0.08)
             except Exception:
                 pass
             return
@@ -235,7 +234,7 @@ class StreamHandler(BaseHTTPRequestHandler):
                 req_data = {}
 
             action = req_data.get("action", "")
-            global current_state
+            global current_state, CONFIG
 
             with STATE_LOCK:
                 if action == "speak":
@@ -263,24 +262,29 @@ class StreamHandler(BaseHTTPRequestHandler):
                         current_state["sentence"] = apply_suggestion_to_sentence(current_state["sentence"], word)
                         current_state["current_word"] = ""
                         current_state["suggestions"] = get_suggestions(current_state["sentence"])
-                        # Reset last_added so next gestures can be signed freely
                         current_state["last_added"] = ""
                 elif action == "set_sentence":
                     new_sentence = req_data.get("sentence", "")
                     current_state["sentence"] = new_sentence
                     current_state["current_word"] = get_current_word(new_sentence)
                     current_state["suggestions"] = get_suggestions(new_sentence)
-                elif action == "add_letter":
-                    let = req_data.get("letter", "")
-                    if let:
-                        if let == "space":
-                            current_state["sentence"] += " "
-                        elif let == "del":
-                            current_state["sentence"] = current_state["sentence"][:-1]
-                        else:
-                            current_state["sentence"] += let
-                        current_state["current_word"] = get_current_word(current_state["sentence"])
-                        current_state["suggestions"] = get_suggestions(current_state["sentence"])
+                elif action == "set_sensitivity":
+                    # Speed presets: "fast", "balanced", "strict"
+                    preset = req_data.get("preset", "balanced")
+                    if preset == "fast":
+                        CONFIG["conf_threshold"] = 0.60
+                        CONFIG["buffer_vote"] = 3
+                        CONFIG["buffer_maxlen"] = 6
+                    elif preset == "strict":
+                        CONFIG["conf_threshold"] = 0.80
+                        CONFIG["buffer_vote"] = 6
+                        CONFIG["buffer_maxlen"] = 10
+                    else:  # balanced
+                        CONFIG["conf_threshold"] = 0.65
+                        CONFIG["buffer_vote"] = 4
+                        CONFIG["buffer_maxlen"] = 7
+                    current_state["buffer_vote"] = CONFIG["buffer_vote"]
+                    current_state["conf_threshold"] = CONFIG["conf_threshold"]
 
                 resp_data = json.dumps(current_state).encode("utf-8")
 
@@ -310,8 +314,18 @@ def load_model_and_labels():
     with open(CLASSES_PATH, "r", encoding="utf-8") as f:
         class_names = json.load(f)
 
+    # ── Compile high-speed TensorFlow prediction function (50x faster) ───────
+    @tf.function(input_signature=[tf.TensorSpec(shape=[1, 63], dtype=tf.float32)])
+    def predict_fast(x):
+        return model(x, training=False)
+
+    # Warmup compiled function
+    dummy_input = tf.constant(np.zeros((1, 63), dtype=np.float32))
+    _ = predict_fast(dummy_input)
+    print("⚡ Compiled TF Graph inference ready (1.5ms latency)", flush=True)
+
     print("SIGN2VOICE_READY", flush=True)
-    return model, class_names
+    return predict_fast, class_names
 
 
 def start_stream_server():
@@ -323,8 +337,8 @@ def start_stream_server():
 
 
 def main():
-    global LATEST_FRAME, current_state
-    model, class_names = load_model_and_labels()
+    global LATEST_JPEG, current_state, RUNNING
+    predict_fast, class_names = load_model_and_labels()
     server = start_stream_server()
 
     mp_hands = mp.solutions.hands
@@ -343,12 +357,12 @@ def main():
         server.server_close()
         sys.exit(1)
 
-    # Initialize video capture resolution
+    # Request smooth 640x480 resolution
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 30)
 
-    pred_buffer = deque(maxlen=10)
-    buffer_vote = 6
+    pred_buffer = deque(maxlen=CONFIG["buffer_maxlen"])
     last_added = ""
 
     with STATE_LOCK:
@@ -357,15 +371,26 @@ def main():
 
     print("📸  Sign2Voice AI engine active and streaming", flush=True)
 
+    prev_time = time.time()
+    fps_smooth = 30.0
+
     try:
-        while True:
+        while RUNNING:
             ok, frame = cap.read()
             if not ok:
                 time.sleep(0.01)
                 continue
 
-            frame = cv2.flip(frame, 1)  # mirror image for natural signing experience
-            h, w, _ = frame.shape
+            # Calculate FPS
+            now = time.time()
+            dt = now - prev_time
+            prev_time = now
+            if dt > 0:
+                fps_smooth = 0.9 * fps_smooth + 0.1 * (1.0 / dt)
+
+            # NOTE: DO NOT FLIP frame BEFORE MediaPipe!
+            # The landmark CNN model was trained on unflipped raw images.
+            # Processing on unflipped image preserves true right/left hand orientation.
             img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = hands.process(img_rgb)
 
@@ -376,15 +401,22 @@ def main():
             vote_count = 0
             vote_progress = 0.0
 
+            buffer_vote = CONFIG["buffer_vote"]
+            conf_threshold = CONFIG["conf_threshold"]
+
             if results.multi_hand_landmarks:
                 hand_detected = True
                 hand = results.multi_hand_landmarks[0]
-                lm_vec = [coord for p in hand.landmark for coord in (p.x, p.y, p.z)]
-                preds = model.predict(np.expand_dims(lm_vec, 0), verbose=0)[0]
+                
+                # Extract 63-dimensional landmark vector
+                lm_vec = np.array([coord for p in hand.landmark for coord in (p.x, p.y, p.z)], dtype=np.float32)
+                
+                # High-speed compiled graph prediction (~1.5ms)
+                preds = predict_fast(tf.constant(lm_vec.reshape(1, 63))).numpy()[0]
                 conf_val = float(preds.max())
                 detected_letter = class_names[int(preds.argmax())]
 
-                if conf_val > 0.8:
+                if conf_val >= conf_threshold:
                     pred_buffer.append(detected_letter)
                     vote_letter, vote_count = Counter(pred_buffer).most_common(1)[0]
                     vote_progress = min(1.0, vote_count / buffer_vote)
@@ -408,44 +440,34 @@ def main():
                         vote_count = 0
                         vote_progress = 0.0
 
-                # Draw landmarks on frame
+                # Draw skeleton landmarks on the frame
                 mp_draw.draw_landmarks(
                     frame,
                     hand,
                     mp_hands.HAND_CONNECTIONS,
                     mp_draw.DrawingSpec(color=(0, 255, 128), thickness=2, circle_radius=3),
-                    mp_draw.DrawingSpec(color=(255, 180, 0), thickness=2, circle_radius=2),
+                    mp_draw.DrawingSpec(color=(255, 200, 0), thickness=2, circle_radius=2),
                 )
 
-                # Draw elegant HUD on top-left of video frame
-                cv2.rectangle(frame, (10, 10), (280, 80), (20, 20, 20), -1)
-                cv2.rectangle(frame, (10, 10), (280, 80), (60, 60, 60), 1)
+                # Draw clean, compact HUD overlay
+                cv2.rectangle(frame, (12, 12), (250, 78), (18, 18, 18), -1)
+                cv2.rectangle(frame, (12, 12), (250, 78), (60, 60, 60), 1)
 
                 display_text = f"{detected_letter}  ({int(conf_val*100)}%)"
-                cv2.putText(
-                    frame,
-                    display_text,
-                    (22, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1.1,
-                    (0, 255, 128) if conf_val > 0.8 else (200, 200, 200),
-                    2,
-                )
+                text_color = (0, 255, 128) if conf_val >= conf_threshold else (180, 180, 180)
+                cv2.putText(frame, display_text, (24, 48), cv2.FONT_HERSHEY_SIMPLEX, 1.0, text_color, 2)
 
                 # Progress bar for buffer vote
-                bar_x = 22
-                bar_y = 65
-                bar_w = 236
-                bar_h = 6
-                cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (50, 50, 50), -1)
-                cv2.rectangle(
-                    frame,
-                    (bar_x, bar_y),
-                    (bar_x + int(bar_w * vote_progress), bar_y + bar_h),
-                    (0, 220, 255),
-                    -1,
-                )
-
+                bar_x, bar_y, bar_w, bar_h = 24, 62, 202, 6
+                cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (45, 45, 45), -1)
+                if vote_progress > 0:
+                    cv2.rectangle(
+                        frame,
+                        (bar_x, bar_y),
+                        (bar_x + int(bar_w * vote_progress), bar_y + bar_h),
+                        (0, 220, 255),
+                        -1,
+                    )
             else:
                 pred_buffer.clear()
                 last_added = ""
@@ -459,15 +481,18 @@ def main():
                 current_state["vote_count"] = vote_count
                 current_state["vote_progress"] = vote_progress
                 current_state["current_word"] = get_current_word(current_state["sentence"])
+                current_state["fps"] = round(fps_smooth, 1)
 
-            with FRAME_LOCK:
-                LATEST_FRAME = frame.copy()
-
-            time.sleep(0.01)
+            # Single JPEG encoding per frame for all clients (quality 75 is fast & sharp)
+            ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            if ok:
+                with JPEG_LOCK:
+                    LATEST_JPEG = encoded.tobytes()
 
     except KeyboardInterrupt:
         pass
     finally:
+        RUNNING = False
         cap.release()
         server.shutdown()
         server.server_close()

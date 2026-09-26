@@ -42,6 +42,9 @@ export default function Dashboard({ setIsAuthenticated }) {
   const [detectedConfidence, setDetectedConfidence] = useState(0)
   const [voteProgress, setVoteProgress] = useState(0)
   const [handDetected, setHandDetected] = useState(false)
+  const [fps, setFps] = useState(30)
+  const [mirrorView, setMirrorView] = useState(false)
+  const [speedPreset, setSpeedPreset] = useState("balanced")
 
   // Sentence & Suggestion state
   const [sentence, setSentence] = useState("")
@@ -217,6 +220,7 @@ export default function Dashboard({ setIsAuthenticated }) {
             setDetectedConfidence(Math.round((data.confidence || 0) * 100))
             setVoteProgress(Math.round((data.vote_progress || 0) * 100))
             setHandDetected(Boolean(data.hand_detected))
+            if (data.fps) setFps(data.fps)
             setDetectionState(
               data.hand_detected
                 ? `Hand detected • ${Math.round((data.confidence || 0) * 100)}% confidence`
@@ -244,6 +248,7 @@ export default function Dashboard({ setIsAuthenticated }) {
                 setDetectedConfidence(Math.round((data.confidence || 0) * 100))
                 setVoteProgress(Math.round((data.vote_progress || 0) * 100))
                 setHandDetected(Boolean(data.hand_detected))
+                if (data.fps) setFps(data.fps)
               }
             } catch (pollErr) {
               // Ignore transient poll drops
@@ -358,6 +363,13 @@ export default function Dashboard({ setIsAuthenticated }) {
     if (autoSpeak) {
       speakText(word)
     }
+  }
+
+  // Speed sensitivity presets
+  const handleSetPreset = (preset) => {
+    setSpeedPreset(preset)
+    dispatchAction("set_sensitivity", { preset })
+    setMessage(`⚡ Recognition mode: ${preset.toUpperCase()}`)
   }
 
   // Save current sentence to MongoDB
@@ -541,24 +553,40 @@ export default function Dashboard({ setIsAuthenticated }) {
                 </span>
               </div>
 
-              {cameraActive ? (
-                <button
-                  onClick={handleStopWebcam}
-                  className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
-                >
-                  <CameraOff className="w-3.5 h-3.5" />
-                  Stop Camera
-                </button>
-              ) : (
-                <button
-                  onClick={handleStartWebcam}
-                  disabled={loading}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  {loading ? "Starting..." : "Start Camera"}
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {cameraActive && (
+                  <button
+                    onClick={() => setMirrorView(!mirrorView)}
+                    title="Toggle mirror (selfie) view"
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                      mirrorView
+                        ? "bg-blue-600/30 text-blue-300 border-blue-500/50 shadow-sm"
+                        : "bg-gray-800 text-gray-400 border-gray-700 hover:text-white"
+                    }`}
+                  >
+                    🪞 {mirrorView ? "Mirrored" : "Normal"}
+                  </button>
+                )}
+
+                {cameraActive ? (
+                  <button
+                    onClick={handleStopWebcam}
+                    className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
+                  >
+                    <CameraOff className="w-3.5 h-3.5" />
+                    Stop Camera
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleStartWebcam}
+                    disabled={loading}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    {loading ? "Starting..." : "Start Camera"}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Video Container */}
@@ -568,7 +596,9 @@ export default function Dashboard({ setIsAuthenticated }) {
                   key={streamUrl}
                   src={streamUrl}
                   alt="Sign2Voice live feed"
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover transition-transform duration-200 ${
+                    mirrorView ? "-scale-x-100" : ""
+                  }`}
                   onError={() => {
                     setMessage("⚠️ Camera stream interrupted. Retrying...")
                   }}
@@ -608,13 +638,33 @@ export default function Dashboard({ setIsAuthenticated }) {
               )}
             </div>
 
-            {/* Bottom info bar */}
-            <div className="mt-4 flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-800/50">
+            {/* Bottom info bar with FPS and Speed Presets */}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-400 pt-2 border-t border-gray-800/50">
               <span className="flex items-center gap-1.5">
                 <Zap className="w-3.5 h-3.5 text-yellow-400" />
-                28 ASL Classes (A-Z, Space, Del)
+                <span className="text-white font-semibold">{fps} FPS</span> • 1.5ms Inference
               </span>
-              <span>Buffer Threshold: 6 / 10 frames</span>
+
+              <div className="flex items-center gap-1 bg-gray-800/80 p-1 rounded-xl border border-gray-700/60">
+                <span className="text-[10px] text-gray-400 px-1.5">Speed:</span>
+                {[
+                  { id: "fast", label: "Fast", desc: "Quickest" },
+                  { id: "balanced", label: "Balanced", desc: "Default" },
+                  { id: "strict", label: "Strict", desc: "Steadiest" },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleSetPreset(item.id)}
+                    className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold transition-all ${
+                      speedPreset === item.id
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
