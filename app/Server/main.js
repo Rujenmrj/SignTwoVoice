@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -13,7 +13,6 @@ import path from "path";
 dotenv.config();
 const app = express();
 
-// Middlewares
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
@@ -23,16 +22,12 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Public / User Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/sentences", sentenceRoutes);
 app.use("/api/camera", cameraRoutes);
+app.use("/api/admin", adminAuthRoutes);
+app.use("/api/admin-panel", adminPanelRoutes);
 
-// Admin Routes
-app.use("/api/admin", adminAuthRoutes);       // Admin login/register
-app.use("/api/admin-panel", adminPanelRoutes); // Admin panel actions
-
-// Health check
 app.get("/api/health", (req, res) => {
   res.json({
     status: "OK",
@@ -41,33 +36,41 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Open Sign2Voice GUI
 app.post("/api/open-webcam", (req, res) => {
   const projectRoot = "C:\\Users\\LOQ\\Desktop\\s2v\\Sign2Voice_Final";
   const pythonExecutable = process.env.SIGN2VOICE_PYTHON || "C:\\Users\\LOQ\\anaconda3\\envs\\sign2voice\\python.exe";
   const scriptPath = path.join(projectRoot, "app", "gui_main.py");
+
+  let hasResponded = false;
+  let stdoutBuffer = "";
 
   const pythonProcess = spawn(pythonExecutable, [scriptPath], {
     cwd: projectRoot,
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, PYTHONPATH: projectRoot },
   });
-  let hasResponded = false;
+
+  const finish = (payload, statusCode = 200) => {
+    if (hasResponded) return;
+    hasResponded = true;
+    clearTimeout(timeout);
+    if (statusCode >= 400) {
+      res.status(statusCode).json(payload);
+      return;
+    }
+    res.json(payload);
+  };
 
   const timeout = setTimeout(() => {
-    if (!hasResponded) {
-      hasResponded = true;
-      res.status(500).json({ error: "Python script initialization timeout" });
-    }
-  }, 30000);
+    finish({ error: "Python script initialization timeout" }, 500);
+  }, 60000);
 
   pythonProcess.stdout.on("data", (data) => {
     const output = data.toString();
+    stdoutBuffer += output;
     console.log("Python stdout:", output);
-    if (output.includes("SIGN2VOICE_READY") && !hasResponded) {
-      hasResponded = true;
-      clearTimeout(timeout);
-      res.json({
+    if (stdoutBuffer.includes("STREAM_READY http://localhost:5001/stream") && !hasResponded) {
+      finish({
         message: "✅ Webcam Translator launched and ready",
         streamUrl: "http://localhost:5001/stream",
       });
@@ -80,19 +83,13 @@ app.post("/api/open-webcam", (req, res) => {
 
   pythonProcess.on("error", (error) => {
     console.error("Error launching GUI:", error.message);
-    if (!hasResponded) {
-      hasResponded = true;
-      clearTimeout(timeout);
-      res.status(500).json({ error: "Failed to launch Python script" });
-    }
+    finish({ error: "Failed to launch Python script" }, 500);
   });
 
   pythonProcess.on("close", (code) => {
     console.log(`Python process exited with code ${code}`);
     if (!hasResponded) {
-      hasResponded = true;
-      clearTimeout(timeout);
-      res.json({
+      finish({
         message: "Python script completed",
         streamUrl: "http://localhost:5001/stream",
       });
@@ -100,7 +97,6 @@ app.post("/api/open-webcam", (req, res) => {
   });
 });
 
-// MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI || "mongodb://localhost:27017/sign2voice")
   .then(() => console.log("✅ MongoDB connected successfully"))
@@ -109,13 +105,11 @@ mongoose
     process.exit(1);
   });
 
-// Error handling
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
   res.status(500).json({ error: "Internal server error" });
 });
 
-// 404 handler
 app.use("*", (req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
