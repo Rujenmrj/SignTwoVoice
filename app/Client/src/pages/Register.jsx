@@ -1,21 +1,37 @@
 "use client"
 
+// ============================================================================
+// SECTION 1: IMPORTS & DEPENDENCIES
+// ============================================================================
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import axios from "axios"
 
+// ============================================================================
+// SECTION 2: API CONFIGURATION
+// ============================================================================
 const API_BASE = "http://localhost:5000/api"
 
+// ============================================================================
+// SECTION 3: COMPONENT DEFINITION & FORM STATE
+// ============================================================================
 export default function Register({ setIsAuthenticated }) {
+  // Controlled form state for user registration
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     password: "",
     confirmPassword: "",
   })
+  // Request loading state
   const [loading, setLoading] = useState(false)
+  // Form error notification
   const [error, setError] = useState("")
 
+  // ============================================================================
+  // SECTION 4: FORM INPUT CHANGE HANDLER
+  // ============================================================================
+  // Updates local form data on keystrokes
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -23,13 +39,20 @@ export default function Register({ setIsAuthenticated }) {
     })
   }
 
-  // Password validation helper
+  // ============================================================================
+  // SECTION 5: PASSWORD VALIDATION LOGIC
+  // ============================================================================
+  // Ensures password has >= 8 chars, uppercase, lowercase, number, and special char
   const validatePassword = (password) => {
     const regex =
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/
     return regex.test(password)
   }
 
+  // ============================================================================
+  // SECTION 6: REGISTRATION SUBMIT HANDLER
+  // ============================================================================
+  // Validates matching passwords & complexity, posts new user to backend, and authenticates
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -69,9 +92,13 @@ export default function Register({ setIsAuthenticated }) {
     }
   }
 
+  // ============================================================================
+  // SECTION 7: UI RENDER (CARD CONTAINER, HEADER, INPUTS & ACTIONS)
+  // ============================================================================
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
+        {/* Header & Subtitle */}
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Create your Sign2Voice account
@@ -81,8 +108,10 @@ export default function Register({ setIsAuthenticated }) {
           </p>
         </div>
 
+        {/* Registration Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
+            {/* Username Input */}
             <div>
               <input
                 id="username"
@@ -95,6 +124,7 @@ export default function Register({ setIsAuthenticated }) {
                 onChange={handleChange}
               />
             </div>
+            {/* Email Input */}
             <div>
               <input
                 id="email"
@@ -107,6 +137,7 @@ export default function Register({ setIsAuthenticated }) {
                 onChange={handleChange}
               />
             </div>
+            {/* Password Input */}
             <div>
               <input
                 id="password"
@@ -119,6 +150,7 @@ export default function Register({ setIsAuthenticated }) {
                 onChange={handleChange}
               />
             </div>
+            {/* Confirm Password Input */}
             <div>
               <input
                 id="confirmPassword"
@@ -133,12 +165,14 @@ export default function Register({ setIsAuthenticated }) {
             </div>
           </div>
 
+          {/* Error Message Alert */}
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}
             </div>
           )}
 
+          {/* Submit Button */}
           <div>
             <button
               type="submit"
@@ -149,6 +183,7 @@ export default function Register({ setIsAuthenticated }) {
             </button>
           </div>
 
+          {/* Navigation to Login */}
           <div className="text-center">
             <Link
               to="/"

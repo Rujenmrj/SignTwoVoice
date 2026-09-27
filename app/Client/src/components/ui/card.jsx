@@ -1,7 +1,14 @@
+// ============================================================================
+// SECTION 1: IMPORTS & CLASSNAMES HELPER
+// ============================================================================
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+// ============================================================================
+// SECTION 2: ROOT CARD CONTAINER COMPONENT
+// ============================================================================
+// Main Card wrapper with background, border, shadow, and flex column layout
 function Card({
   className,
   ...props
@@ -17,6 +24,10 @@ function Card({
   );
 }
 
+// ============================================================================
+// SECTION 3: CARD HEADER & TITLES
+// ============================================================================
+// Header container for card title, action, and description
 function CardHeader({
   className,
   ...props
@@ -32,6 +43,7 @@ function CardHeader({
   );
 }
 
+// Title typography component
 function CardTitle({
   className,
   ...props
@@ -44,6 +56,7 @@ function CardTitle({
   );
 }
 
+// Description subtitle typography
 function CardDescription({
   className,
   ...props
@@ -56,6 +69,10 @@ function CardDescription({
   );
 }
 
+// ============================================================================
+// SECTION 4: CARD CONTENT & ACTION ELEMENTS
+// ============================================================================
+// Header action slot for right-aligned buttons or badges
 function CardAction({
   className,
   ...props
@@ -71,6 +88,7 @@ function CardAction({
   );
 }
 
+// Main body container for card content
 function CardContent({
   className,
   ...props
@@ -78,6 +96,10 @@ function CardContent({
   return (<div data-slot="card-content" className={cn("px-6", className)} {...props} />);
 }
 
+// ============================================================================
+// SECTION 5: CARD FOOTER
+// ============================================================================
+// Bottom container for actions or auxiliary information
 function CardFooter({
   className,
   ...props
@@ -90,6 +112,9 @@ function CardFooter({
   );
 }
 
+// ============================================================================
+// SECTION 6: MODULE EXPORTS
+// ============================================================================
 export {
   Card,
   CardHeader,

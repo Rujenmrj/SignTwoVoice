@@ -1,19 +1,35 @@
 "use client"
 
+// ============================================================================
+// SECTION 1: IMPORTS & DEPENDENCIES
+// ============================================================================
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import axios from "axios"
 
+// ============================================================================
+// SECTION 2: API CONFIGURATION
+// ============================================================================
 const API_BASE = "http://localhost:5000/api"
 
+// ============================================================================
+// SECTION 3: COMPONENT DEFINITION & FORM STATE
+// ============================================================================
 export default function Login({ setIsAuthenticated }) {
+  // Controlled form state for user credentials
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
+  // Request loading state
   const [loading, setLoading] = useState(false)
+  // Form error notification
   const [error, setError] = useState("")
 
+  // ============================================================================
+  // SECTION 4: FORM INPUT CHANGE HANDLER
+  // ============================================================================
+  // Updates local form data on keystrokes
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -21,6 +37,10 @@ export default function Login({ setIsAuthenticated }) {
     })
   }
 
+  // ============================================================================
+  // SECTION 5: AUTHENTICATION FORM SUBMIT HANDLER
+  // ============================================================================
+  // Submits credentials to login endpoint, saves token & user data, updates auth state
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -40,16 +60,22 @@ export default function Login({ setIsAuthenticated }) {
     }
   }
 
+  // ============================================================================
+  // SECTION 6: UI RENDER (CARD CONTAINER, BRANDING, FORM INPUTS & LINKS)
+  // ============================================================================
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
+        {/* Branding & Subtitle */}
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Sign in to Sign2Voice</h2>
           <p className="mt-2 text-center text-sm text-gray-600">Transform sign language into voice with AI</p>
         </div>
 
+        {/* Login Credentials Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
+            {/* Email Input */}
             <div>
               <label htmlFor="email" className="sr-only">
                 Email address
@@ -65,6 +91,8 @@ export default function Login({ setIsAuthenticated }) {
                 onChange={handleChange}
               />
             </div>
+
+            {/* Password Input */}
             <div>
               <label htmlFor="password" className="sr-only">
                 Password
@@ -82,8 +110,10 @@ export default function Login({ setIsAuthenticated }) {
             </div>
           </div>
 
+          {/* Error Message Alert */}
           {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">{error}</div>}
 
+          {/* Submit Button */}
           <div>
             <button
               type="submit"
@@ -94,6 +124,7 @@ export default function Login({ setIsAuthenticated }) {
             </button>
           </div>
 
+          {/* Registration Redirect Link */}
           <div className="text-center">
             <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
               Don't have an account? Sign up

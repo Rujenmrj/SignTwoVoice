@@ -1,7 +1,14 @@
+// ============================================================================
+// SECTION 1: IMPORTS & CLASSNAMES HELPER
+// ============================================================================
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+// ============================================================================
+// SECTION 2: INPUT COMPONENT DEFINITION
+// ============================================================================
+// Styled native input component with accessible focus states, dark mode, and invalid states
 function Input({
   className,
   type,
@@ -21,4 +28,7 @@ function Input({
   );
 }
 
+// ============================================================================
+// SECTION 3: MODULE EXPORT
+// ============================================================================
 export { Input }

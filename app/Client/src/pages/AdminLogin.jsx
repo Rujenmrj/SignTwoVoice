@@ -1,28 +1,55 @@
 "use client";
 
+// ============================================================================
+// SECTION 1: IMPORTS & EXTERNAL DEPENDENCIES
+// ============================================================================
+// React hooks and HTTP client
 import { useState } from "react";
 import axios from "axios";
+
+// UI primitives and layout components
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+
+// Animation & Icon utilities
 import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+// ============================================================================
+// SECTION 2: API BASE CONFIGURATION
+// ============================================================================
 const API_BASE = "http://localhost:5000/api/admin"; // Admin routes
 
+// ============================================================================
+// SECTION 3: COMPONENT DEFINITION & STATE INITIALIZATION
+// ============================================================================
 export default function AdminLogin() {
+  // Form input values for admin credentials
   const [formData, setFormData] = useState({ email: "", password: "" });
+  // Password visibility toggle flag
   const [showPassword, setShowPassword] = useState(false);
+  // Async submission loading state
   const [loading, setLoading] = useState(false);
+  // Error message for invalid authentication attempts
   const [error, setError] = useState("");
+  // Navigation hook to redirect upon successful login
   const navigate = useNavigate();
 
+  // ============================================================================
+  // SECTION 4: FORM INPUT HANDLER
+  // ============================================================================
+  // Synchronizes controlled inputs with formData state and clears active errors
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError("");
   };
 
+  // ============================================================================
+  // SECTION 5: ADMIN AUTHENTICATION SUBMIT HANDLER
+  // ============================================================================
+  // Submits admin credentials to server, stores admin token and navigates to panel
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -42,16 +69,23 @@ export default function AdminLogin() {
     }
   };
 
+  // ============================================================================
+  // SECTION 6: UI RENDER (CARD, FORM INPUTS, SUBMIT BUTTON & ERROR BANNER)
+  // ============================================================================
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
+      {/* Admin Login Container Card */}
       <Card className="w-full max-w-md bg-gray-800 shadow-xl border border-gray-700 rounded-2xl overflow-hidden">
+        {/* Card Header & Title */}
         <CardHeader className="bg-gray-700 text-white text-center py-8">
           <CardTitle className="text-2xl font-bold">Admin Login</CardTitle>
           <p className="text-gray-300 mt-2">Sign in with your admin credentials</p>
         </CardHeader>
 
+        {/* Card Body & Form */}
         <CardContent className="p-8">
           <form onSubmit={handleLogin} className="space-y-5">
+            {/* Email Input Field */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
               <Input
@@ -65,6 +99,7 @@ export default function AdminLogin() {
               />
             </div>
 
+            {/* Password Input Field with Visibility Toggle */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
               <div className="relative">
@@ -87,6 +122,7 @@ export default function AdminLogin() {
               </div>
             </div>
 
+            {/* Submit Action Button */}
             <Button
               type="submit"
               disabled={loading}
@@ -96,6 +132,7 @@ export default function AdminLogin() {
             </Button>
           </form>
 
+          {/* Animated Error Alert */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}

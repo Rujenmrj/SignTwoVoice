@@ -1,8 +1,15 @@
 "use client"
 
+// ============================================================================
+// SECTION 1: IMPORTS & DEPENDENCIES
+// ============================================================================
+// React hooks for state, side effects, DOM references, and memoized callbacks
 import { useState, useEffect, useRef, useCallback } from "react"
+// React Router navigation hook
 import { useNavigate } from "react-router-dom"
+// HTTP client for backend REST API communication
 import axios from "axios"
+// Lucide icons for rich UI iconography
 import {
   Volume2,
   VolumeX,
@@ -20,7 +27,13 @@ import {
   Zap,
 } from "lucide-react"
 
+// ============================================================================
+// SECTION 2: MAIN DASHBOARD COMPONENT & STATE DECLARATIONS
+// ============================================================================
 export default function Dashboard({ setIsAuthenticated }) {
+  // --------------------------------------------------------------------------
+  // 2.1 General User & UI State
+  // --------------------------------------------------------------------------
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
@@ -34,7 +47,9 @@ export default function Dashboard({ setIsAuthenticated }) {
   const [systemStatus, setSystemStatus] = useState({ cpu: 0, memory: 0, network: "Checking..." })
   const [todayGoal, setTodayGoal] = useState({ target: 10, completed: 2 })
 
-  // Camera & Detection state
+  // --------------------------------------------------------------------------
+  // 2.2 Camera & Real-Time Gesture Detection State
+  // --------------------------------------------------------------------------
   const [cameraActive, setCameraActive] = useState(false)
   const [streamUrl, setStreamUrl] = useState("")
   const [detectionState, setDetectionState] = useState("Waiting for camera")
@@ -46,7 +61,9 @@ export default function Dashboard({ setIsAuthenticated }) {
   const [mirrorView, setMirrorView] = useState(false)
   const [speedPreset, setSpeedPreset] = useState("balanced")
 
-  // Sentence & Suggestion state
+  // --------------------------------------------------------------------------
+  // 2.3 Sentence Formation, Word Suggestions & Audio State
+  // --------------------------------------------------------------------------
   const [sentence, setSentence] = useState("")
   const [suggestions, setSuggestions] = useState(["HELLO", "THANK", "YOU", "PLEASE"])
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -55,11 +72,21 @@ export default function Dashboard({ setIsAuthenticated }) {
   const [showAslGuide, setShowAslGuide] = useState(false)
   const [savingSentence, setSavingSentence] = useState(false)
 
+  // --------------------------------------------------------------------------
+  // 2.4 References & Router Navigation
+  // --------------------------------------------------------------------------
   const sseRef = useRef(null)
   const pollingRef = useRef(null)
   const sentenceEndSpokenRef = useRef("")
   const navigate = useNavigate()
 
+  // ============================================================================
+  // SECTION 3: STATIC CONFIGURATION & CONSTANTS
+  // ============================================================================
+
+  // --------------------------------------------------------------------------
+  // 3.1 AI Engine Startup Loading Steps
+  // --------------------------------------------------------------------------
   const loadingSteps = [
     "Initializing Sign2Voice AI...",
     "Loading CNN Landmark Classification Model...",
@@ -68,7 +95,9 @@ export default function Dashboard({ setIsAuthenticated }) {
     "Ready to sign!",
   ]
 
-  // ASL Alphabet data for cheat sheet
+  // --------------------------------------------------------------------------
+  // 3.2 ASL Alphabet Reference Guide Data (28 Gestures)
+  // --------------------------------------------------------------------------
   const aslAlphabet = [
     { letter: "A", desc: "Fist with thumb resting on side" },
     { letter: "B", desc: "Open palm with 4 fingers up, thumb folded" },
@@ -100,7 +129,13 @@ export default function Dashboard({ setIsAuthenticated }) {
     { letter: "del", desc: "Special gesture to Backspace/Delete" },
   ]
 
-  // Authentication check
+  // ============================================================================
+  // SECTION 4: LIFECYCLE HOOKS & SIDE EFFECTS
+  // ============================================================================
+
+  // --------------------------------------------------------------------------
+  // 4.1 Authentication & User Session Verification
+  // --------------------------------------------------------------------------
   useEffect(() => {
     const token = localStorage.getItem("token")
     if (!token) return navigate("/")
@@ -118,7 +153,9 @@ export default function Dashboard({ setIsAuthenticated }) {
       })
   }, [navigate, setIsAuthenticated])
 
-  // Clock
+  // --------------------------------------------------------------------------
+  // 4.2 Live Clock Interval
+  // --------------------------------------------------------------------------
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date())
@@ -126,12 +163,16 @@ export default function Dashboard({ setIsAuthenticated }) {
     return () => clearInterval(timer)
   }, [])
 
-  // Weather & stats initialization
+  // --------------------------------------------------------------------------
+  // 4.3 Initial Statistics & History Data Fetch
+  // --------------------------------------------------------------------------
   useEffect(() => {
     fetchStats()
   }, [])
 
-  // Loading animation step timer
+  // --------------------------------------------------------------------------
+  // 4.4 Camera / AI Initialization Progress Timer
+  // --------------------------------------------------------------------------
   useEffect(() => {
     let interval
     if (loading) {
@@ -145,9 +186,16 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }, [loading])
 
-  // Speech function using Web Speech API + backend fallback
+  // ============================================================================
+  // SECTION 5: AUDIO, AI ENGINE DISPATCH & SYNCHRONIZATION
+  // ============================================================================
+
+  // --------------------------------------------------------------------------
+  // 5.1 Speech Synthesis (Web Speech API + Backend Pyttsx3 Fallback)
+  // --------------------------------------------------------------------------
   const speakText = useCallback((text) => {
     if (!text || !text.trim()) return
+
     const clean = text.trim()
     setIsSpeaking(true)
 
@@ -167,7 +215,10 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }, [])
 
-  // Action dispatcher to AI engine (handles clear, backspace, space, suggestion, etc.)
+  // --------------------------------------------------------------------------
+  // 5.2 Action Dispatcher to Python AI Engine
+  // --------------------------------------------------------------------------
+  // Handles clear, backspace, space, suggestion selection, sensitivity, etc.
   const dispatchAction = useCallback(async (action, payload = {}) => {
     try {
       // Try direct engine on 5001 first, fallback to Express proxy on 5000
@@ -189,7 +240,9 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }, [])
 
-  // State synchronization via SSE and polling
+  // --------------------------------------------------------------------------
+  // 5.3 Real-Time State Synchronization (SSE & Polling Fallback)
+  // --------------------------------------------------------------------------
   useEffect(() => {
     if (!cameraActive) {
       if (sseRef.current) {
@@ -272,7 +325,9 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }, [cameraActive])
 
-  // Auto-speak on completed words if enabled
+  // --------------------------------------------------------------------------
+  // 5.4 Auto-Speak Watcher on Completed Words
+  // --------------------------------------------------------------------------
   useEffect(() => {
     if (autoSpeak && sentence.endsWith(" ") && sentence.trim() !== sentenceEndSpokenRef.current) {
       const words = sentence.trim().split(/\s+/)
@@ -284,7 +339,10 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }, [autoSpeak, sentence, speakText])
 
-  // Keyboard controls (S=speak, C=clear, Space=space, Backspace=delete, 1-4=suggestion)
+  // --------------------------------------------------------------------------
+  // 5.5 Global Keyboard Shortcuts Listener
+  // --------------------------------------------------------------------------
+  // S=speak, C=clear, Space=space, Backspace=delete, 1-4=suggestion selection
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Don't intercept if user is focused inside an input/textarea
@@ -317,7 +375,13 @@ export default function Dashboard({ setIsAuthenticated }) {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [sentence, suggestions, speakText, dispatchAction])
 
-  // Start webcam stream
+  // ============================================================================
+  // SECTION 6: EVENT HANDLERS & USER ACTIONS
+  // ============================================================================
+
+  // --------------------------------------------------------------------------
+  // 6.1 Start Webcam & Activate AI Engine
+  // --------------------------------------------------------------------------
   const handleStartWebcam = async () => {
     if (loading || cameraActive) return
     setLoading(true)
@@ -340,7 +404,9 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }
 
-  // Stop webcam stream
+  // --------------------------------------------------------------------------
+  // 6.2 Stop Webcam & Reset Recognition State
+  // --------------------------------------------------------------------------
   const handleStopWebcam = async () => {
     try {
       await axios.post("http://localhost:5000/api/camera/stop-webcam")
@@ -357,7 +423,9 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }
 
-  // Selecting a word suggestion
+  // --------------------------------------------------------------------------
+  // 6.3 Suggestion Selection Handler
+  // --------------------------------------------------------------------------
   const handleSelectSuggestion = (word) => {
     dispatchAction("select_suggestion", { word })
     if (autoSpeak) {
@@ -365,14 +433,18 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }
 
-  // Speed sensitivity presets
+  // --------------------------------------------------------------------------
+  // 6.4 Detection Speed & Sensitivity Preset Handler
+  // --------------------------------------------------------------------------
   const handleSetPreset = (preset) => {
     setSpeedPreset(preset)
     dispatchAction("set_sensitivity", { preset })
     setMessage(`⚡ Recognition mode: ${preset.toUpperCase()}`)
   }
 
-  // Save current sentence to MongoDB
+  // --------------------------------------------------------------------------
+  // 6.5 Save Translated Sentence to History (MongoDB)
+  // --------------------------------------------------------------------------
   const handleSaveSentence = async () => {
     if (!sentence || !sentence.trim()) {
       setMessage("⚠️ Please sign or type a sentence before saving.")
@@ -407,7 +479,9 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }
 
-  // Copy sentence to clipboard
+  // --------------------------------------------------------------------------
+  // 6.6 Copy Sentence to Clipboard
+  // --------------------------------------------------------------------------
   const handleCopySentence = () => {
     if (!sentence) return
     navigator.clipboard.writeText(sentence)
@@ -415,7 +489,9 @@ export default function Dashboard({ setIsAuthenticated }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Fetch stats and sentences from MongoDB
+  // --------------------------------------------------------------------------
+  // 6.7 Fetch User Sentences & Progress Statistics
+  // --------------------------------------------------------------------------
   const fetchStats = async () => {
     try {
       setHistoryLoading(true)
@@ -447,7 +523,9 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }
 
-  // Delete sentence
+  // --------------------------------------------------------------------------
+  // 6.8 Delete Sentence from History
+  // --------------------------------------------------------------------------
   const deleteSentence = async (sentenceId) => {
     try {
       const token = localStorage.getItem("token")
@@ -465,6 +543,9 @@ export default function Dashboard({ setIsAuthenticated }) {
     }
   }
 
+  // --------------------------------------------------------------------------
+  // 6.9 Logout Handler
+  // --------------------------------------------------------------------------
   const handleLogout = () => {
     if (cameraActive) {
       handleStopWebcam()
@@ -475,15 +556,23 @@ export default function Dashboard({ setIsAuthenticated }) {
     navigate("/")
   }
 
+  // ============================================================================
+  // SECTION 7: DASHBOARD UI LAYOUT & RENDER
+  // ============================================================================
   return (
     <div className="min-h-screen bg-black text-gray-100 flex flex-col items-center justify-start p-4 sm:p-6 relative overflow-x-hidden">
-      {/* Background aesthetic glow */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* 7.1 Background Aesthetic Glow Effects                                  */}
+      {/* ---------------------------------------------------------------------- */}
       <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-950 to-zinc-900 pointer-events-none"></div>
       <div className="absolute top-10 left-10 w-96 h-96 bg-blue-900/10 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-10 right-10 w-96 h-96 bg-purple-900/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      {/* Top Navbar */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* 7.2 Top Navigation Header                                              */}
+      {/* ---------------------------------------------------------------------- */}
       <header className="bg-gray-900/80 backdrop-blur-xl border border-gray-800/80 p-4 sm:p-5 flex flex-wrap justify-between items-center w-full max-w-6xl mb-6 rounded-2xl relative z-10 shadow-2xl gap-4">
+        {/* Branding & User Info */}
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
             <span className="text-2xl">👋</span>
@@ -498,6 +587,7 @@ export default function Dashboard({ setIsAuthenticated }) {
           </div>
         </div>
 
+        {/* Action Controls & Info Widgets */}
         <div className="flex items-center gap-3 flex-wrap">
           {/* ASL Reference Guide Button */}
           <button
@@ -508,7 +598,7 @@ export default function Dashboard({ setIsAuthenticated }) {
             <span>ASL Chart</span>
           </button>
 
-          {/* Clock */}
+          {/* Clock Widget */}
           <div className="hidden sm:flex flex-col items-center bg-gray-800/60 rounded-xl px-3 py-1.5 border border-gray-700/40 text-xs">
             <span className="font-bold text-blue-400">
               {currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
@@ -518,7 +608,7 @@ export default function Dashboard({ setIsAuthenticated }) {
             </span>
           </div>
 
-          {/* Logout */}
+          {/* Logout Action */}
           <button
             onClick={handleLogout}
             className="bg-red-600/90 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm flex items-center gap-1.5"
@@ -529,7 +619,9 @@ export default function Dashboard({ setIsAuthenticated }) {
         </div>
       </header>
 
-      {/* Main Translation Workspace */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* 7.3 Main Translation Workspace                                         */}
+      {/* ---------------------------------------------------------------------- */}
       <main className="w-full max-w-6xl relative z-10 space-y-6">
         {/* Banner Notification Message */}
         {message && (
@@ -542,8 +634,11 @@ export default function Dashboard({ setIsAuthenticated }) {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* LEFT: Video Stream Box (7 columns) */}
+          {/* ================================================================== */}
+          {/* 7.3.1 Video Stream & Detection HUD (Left Column - 7 cols)           */}
+          {/* ================================================================== */}
           <div className="lg:col-span-7 bg-gray-900/80 backdrop-blur-xl border border-gray-800/80 rounded-3xl p-5 shadow-2xl flex flex-col justify-between">
+            {/* Stream Header & Camera Controls */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <div className={`w-3 h-3 rounded-full ${cameraActive ? "bg-green-400 animate-pulse" : "bg-gray-600"}`}></div>
@@ -554,6 +649,7 @@ export default function Dashboard({ setIsAuthenticated }) {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Mirror View Toggle */}
                 {cameraActive && (
                   <button
                     onClick={() => setMirrorView(!mirrorView)}
@@ -568,6 +664,7 @@ export default function Dashboard({ setIsAuthenticated }) {
                   </button>
                 )}
 
+                {/* Camera Toggle Button */}
                 {cameraActive ? (
                   <button
                     onClick={handleStopWebcam}
@@ -589,7 +686,7 @@ export default function Dashboard({ setIsAuthenticated }) {
               </div>
             </div>
 
-            {/* Video Container */}
+            {/* Video Viewport Container */}
             <div className="relative overflow-hidden rounded-2xl border border-gray-800 bg-black aspect-video flex items-center justify-center shadow-inner">
               {cameraActive && streamUrl ? (
                 <img
@@ -622,7 +719,7 @@ export default function Dashboard({ setIsAuthenticated }) {
                 </div>
               )}
 
-              {/* HUD Overlay inside video */}
+              {/* In-Video HUD Overlay */}
               {cameraActive && (
                 <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end pointer-events-none">
                   {/* Status chip */}
@@ -630,7 +727,7 @@ export default function Dashboard({ setIsAuthenticated }) {
                     {detectionState}
                   </div>
 
-                  {/* Keyboard hint */}
+                  {/* Keyboard shortcut hint */}
                   <div className="bg-black/75 backdrop-blur-md border border-gray-700/60 px-2.5 py-1 rounded-lg text-[11px] text-gray-400 shadow-lg hidden sm:block">
                     Press <span className="text-blue-400 font-bold">S</span> to speak • <span className="text-red-400 font-bold">C</span> to clear
                   </div>
@@ -638,13 +735,14 @@ export default function Dashboard({ setIsAuthenticated }) {
               )}
             </div>
 
-            {/* Bottom info bar with FPS and Speed Presets */}
+            {/* Bottom info bar with FPS & Speed Presets */}
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-400 pt-2 border-t border-gray-800/50">
               <span className="flex items-center gap-1.5">
                 <Zap className="w-3.5 h-3.5 text-yellow-400" />
                 <span className="text-white font-semibold">{fps} FPS</span> • 1.5ms Inference
               </span>
 
+              {/* Speed Sensitivity Mode Presets */}
               <div className="flex items-center gap-1 bg-gray-800/80 p-1 rounded-xl border border-gray-700/60">
                 <span className="text-[10px] text-gray-400 px-1.5">Speed:</span>
                 {[
@@ -668,7 +766,9 @@ export default function Dashboard({ setIsAuthenticated }) {
             </div>
           </div>
 
-          {/* RIGHT: Live Sign Recognition & Sentence Workspace (5 columns) */}
+          {/* ================================================================== */}
+          {/* 7.3.2 Gesture Recognition HUD & Suggestions (Right Column - 5 cols)*/}
+          {/* ================================================================== */}
           <div className="lg:col-span-5 flex flex-col gap-6">
             {/* Live Sign Detector HUD Card */}
             <div className="bg-gray-900/80 backdrop-blur-xl border border-gray-800/80 rounded-3xl p-5 shadow-2xl">
@@ -759,8 +859,11 @@ export default function Dashboard({ setIsAuthenticated }) {
           </div>
         </div>
 
-        {/* Full-width Sentence Translation & Controls Bar */}
+        {/* ==================================================================== */}
+        {/* 7.3.3 Full-Width Sentence Translation & Action Toolbar               */}
+        {/* ==================================================================== */}
         <div className="bg-gray-900/90 backdrop-blur-xl border border-gray-800/80 rounded-3xl p-6 shadow-2xl space-y-4">
+          {/* Header & Character/Word Metrics */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase font-bold tracking-wider text-blue-400">Translated Sentence</span>
@@ -769,6 +872,7 @@ export default function Dashboard({ setIsAuthenticated }) {
               </span>
             </div>
 
+            {/* Copy Button */}
             <div className="flex items-center gap-2">
               <button
                 onClick={handleCopySentence}
@@ -856,7 +960,9 @@ export default function Dashboard({ setIsAuthenticated }) {
           </div>
         </div>
 
-        {/* History & Statistics Cards */}
+        {/* ---------------------------------------------------------------------- */}
+        {/* 7.4 History & Practice Statistics Cards                                */}
+        {/* ---------------------------------------------------------------------- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Daily Goal Card */}
           <div className="bg-gray-900/80 backdrop-blur-xl border border-gray-800/80 rounded-3xl p-6 shadow-xl">
@@ -919,7 +1025,9 @@ export default function Dashboard({ setIsAuthenticated }) {
           </div>
         </div>
 
-        {/* Expanded History Table */}
+        {/* ---------------------------------------------------------------------- */}
+        {/* 7.5 Expanded Sentence History Drawer / Table                           */}
+        {/* ---------------------------------------------------------------------- */}
         {showHistory && (
           <div className="bg-gray-900/90 backdrop-blur-xl border border-gray-800/80 rounded-3xl p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
@@ -984,7 +1092,9 @@ export default function Dashboard({ setIsAuthenticated }) {
         )}
       </main>
 
-      {/* ASL Alphabet Reference Modal */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* 7.6 ASL Alphabet Reference Modal                                       */}
+      {/* ---------------------------------------------------------------------- */}
       {showAslGuide && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
@@ -1029,7 +1139,9 @@ export default function Dashboard({ setIsAuthenticated }) {
         </div>
       )}
 
-      {/* Loading Modal */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* 7.7 AI Engine Loading / Initialization Modal                           */}
+      {/* ---------------------------------------------------------------------- */}
       {loading && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 border border-gray-800 p-8 rounded-3xl text-center max-w-md w-full shadow-2xl space-y-5">

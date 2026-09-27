@@ -1,19 +1,39 @@
 "use client";
 
+// ============================================================================
+// SECTION 1: IMPORTS & DEPENDENCIES
+// ============================================================================
+// React hooks for component state and lifecycle
 import { useState, useEffect } from "react";
+// React Router navigation hook
 import { useNavigate } from "react-router-dom";
+// HTTP request client
 import axios from "axios";
 
+// ============================================================================
+// SECTION 2: API BASE CONFIGURATION
+// ============================================================================
 const API_BASE = "http://localhost:5000/api/admin-panel";
 
+// ============================================================================
+// SECTION 3: COMPONENT DEFINITION & STATE INITIALIZATION
+// ============================================================================
 export default function AdminPanel() {
+  // Registered user accounts from the database
   const [users, setUsers] = useState([]);
+  // Translated sentences recorded by users
   const [sentences, setSentences] = useState([]);
+  // Loading status during asynchronous data fetch
   const [loading, setLoading] = useState(true);
 
+  // Stored admin session token
   const token = localStorage.getItem("adminToken");
   const navigate = useNavigate();
 
+  // ============================================================================
+  // SECTION 4: DATA FETCHING & SYNCHRONIZATION (LIFECYCLE EFFECT)
+  // ============================================================================
+  // Fetches users list and sentence history concurrently from admin API
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -38,17 +58,30 @@ export default function AdminPanel() {
     if (token) fetchData();
   }, [token]);
 
+  // ============================================================================
+  // SECTION 5: ADMIN SESSION & LOGOUT HANDLER
+  // ============================================================================
+  // Clears admin authentication tokens from storage and redirects to landing page
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
     localStorage.removeItem("admin");
     navigate("/"); // redirect to AuthPage.jsx
   };
 
+  // ============================================================================
+  // SECTION 6: AUTHENTICATION GUARD & LOADING CHECKS
+  // ============================================================================
   if (!token) return <p className="text-center mt-10">Please log in as admin</p>;
   if (loading) return <p className="text-center mt-10">Loading...</p>;
 
+  // ============================================================================
+  // SECTION 7: ADMIN PANEL DASHBOARD RENDER
+  // ============================================================================
   return (
     <div className="min-h-screen bg-gray-900 text-white px-6 py-10">
+      {/* ---------------------------------------------------------------------- */}
+      {/* 7.1 Header & Logout Action                                             */}
+      {/* ---------------------------------------------------------------------- */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold text-center">Admin Panel</h1>
         <button
@@ -59,7 +92,9 @@ export default function AdminPanel() {
         </button>
       </div>
 
-      {/* Users Table */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* 7.2 Registered Users Table                                             */}
+      {/* ---------------------------------------------------------------------- */}
       <section className="mb-12">
         <h2 className="text-2xl font-semibold mb-4">Registered Users</h2>
         <div className="overflow-x-auto">
@@ -84,7 +119,9 @@ export default function AdminPanel() {
         </div>
       </section>
 
-      {/* Sentences Table */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* 7.3 User Sentences History Table                                       */}
+      {/* ---------------------------------------------------------------------- */}
       <section>
         <h2 className="text-2xl font-semibold mb-4">User Sentences History</h2>
         <div className="overflow-x-auto">
